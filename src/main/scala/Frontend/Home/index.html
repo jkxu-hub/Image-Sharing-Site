@@ -1,0 +1,50 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CSE312 Template</title>
+    <link rel="stylesheet" type="text/css" href="../style.css"/>
+</head>
+<body onload="welcomeAlert();">
+
+<h1>Welcome!</h1>
+<p>List of users who have submitted pictures: <br>
+    {{name}}
+</p>
+
+<p>The Gallery:</p>
+{{images}}
+
+<p>Comments: <br>
+    {{comments}}
+</p>
+<br>
+<br>
+
+
+<p>Please submit a photo to the gallery:</p>
+<form action="/image-upload" id="image-form" method="post" enctype="multipart/form-data">
+    <input value={{token1}} name="xsrf_token" hidden>
+    <label for="form-file">Image: </label>
+    <!-- "input". "type" specifies the type of input we allow the user to input. -->
+    <!-- "name" is how we identify the data associated with specific input on the server side -->
+    <input id="form-file" type="file" name="upload">
+    <br/>
+    <label for="image-form-name">Enter your name: </label>
+    <input id="image-form-name" type="text" name="name">
+    <input type="submit" value="Submit">
+</form>
+<br/>
+<p>Comment:</p>
+<form action="/comment" id="comment-form" method="post" enctype="multipart/form-data">
+    <input value={{token2}} name="xsrf_token" hidden>
+    <label for="text-form-name">Name: </label>
+    <input id="text-form-name" type="text" name="name"><br/>
+    <label for="form-comment">Comment: </label>
+    <input id="form-comment" type="text" name="comment">
+    <input type="submit" value="Submit">
+</form>
+
+
+<script src="../functions.js"></script>
+</body>
+</html>
