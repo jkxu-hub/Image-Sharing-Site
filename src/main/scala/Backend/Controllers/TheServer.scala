@@ -23,6 +23,7 @@ import Backend.Models.{StringProcessing => StrProcessing}
 import Backend.Models.{SaveFormInfo => forms}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
+import Backend.Models.{Request}
 
 // source: https://doc.akka.io/docs/akka/current/io-tcp.html
 // source: https://www.geeksforgeeks.org/java-program-to-convert-file-to-a-byte-array/
@@ -138,6 +139,19 @@ class TheServer extends Actor {
             }else{
               sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
             }
+          case "/global-chat" =>
+            val bufferedSource = scala.io.Source.fromFile(dirs.globalChatPage)
+            val content = bufferedSource.mkString
+            sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
+          case "/globalChatFunctions.js" =>
+            //TODO is this a security concern. Users can see the entirety of functions.js.
+            val content = response.readFile(dirs.globalChatFunctions_js, false)
+            sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
+          case "/websocket" =>
+          //Get Sec-WebSocket-Key header
+          //Append GUID to the header key
+          //Computes the SHA -1 hash of this and base 64 encoding
+          // Server sends an HTTP response with the headers
           case _ =>
             //http://localhost:8002/dsfsdf
             //404 Not Found
