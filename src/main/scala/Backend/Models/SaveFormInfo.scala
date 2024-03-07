@@ -2,20 +2,22 @@ package Backend.Models
 
 import scala.collection.mutable.{ArrayBuffer, Map}
 import Backend.Models.{security=> sec}
-import Backend.Models.{HttpRequest => request}
+//import Backend.Models.{HttpRequest => request}
 import Backend.Models.{Database => database}
+import Backend.Models.{Payload}
 
 object SaveFormInfo {
   /** Save image upload form data
    * @return true if the xsrf token was found, false otherwise
    * */
   def save_image_upload_form_data(): Boolean = {
-    request.extract_bytes_between_boundaries(ArrayBuffer("xsrf", "image", "name"))
-    val xsrfToken = request.extract_text("xsrf")
+    Payload.extract_bytes_between_boundaries(ArrayBuffer("xsrf", "image", "name"))
+    val xsrfToken = Payload.extract_text("xsrf")
+    println(xsrfToken)
     if (database.tokens.contains(xsrfToken)) {
       //getting the image and name from the form
-      val fileName = request.extract_image("image")
-      var nameString = request.extract_text("name")
+      val fileName = Payload.extract_image("image")
+      var nameString = Payload.extract_text("name")
 
       //preventing html injection
       nameString = sec.htmlInjectionReplace(nameString)
@@ -28,10 +30,10 @@ object SaveFormInfo {
       //updating global variables
       database.imageNames += fileName
 
-      request.reset_fields()
+      Payload.reset_fields()
       true
     }else {
-      request.reset_fields()
+      Payload.reset_fields()
       false
     }
   }
@@ -40,20 +42,20 @@ object SaveFormInfo {
    * @return true if the xsrf token was found, false otherwise
    * */
   def save_comment_form_data(): Boolean = {
-    request.extract_bytes_between_boundaries(ArrayBuffer("xsrf", "name", "comment"))
-    val xsrfToken = request.extract_text("xsrf")
+    Payload.extract_bytes_between_boundaries(ArrayBuffer("xsrf", "name", "comment"))
+    val xsrfToken = Payload.extract_text("xsrf")
     if (database.tokens.contains(xsrfToken)) {
-      var nameString = request.extract_text("name")
+      var nameString = Payload.extract_text("name")
       nameString = sec.htmlInjectionReplace(nameString)
-      var commentString = request.extract_text("comment")
+      var commentString = Payload.extract_text("comment")
       commentString = sec.htmlInjectionReplace(commentString)
 
       database.htmlComments.append(nameString+ ": " + commentString + "<br>")
 
-      request.reset_fields()
+      Payload.reset_fields()
       true
     } else {
-      request.reset_fields()
+      Payload.reset_fields()
       false
     }
   }

@@ -1,5 +1,14 @@
 // Establish a WebSocket connection with the server
+
 const socket = new WebSocket('ws://' + window.location.host + '/websocket');
+
+
+function getProtocol() {
+    if (socket.readyState === WebSocket.OPEN) {
+        alert("Websocket is working")
+    }
+}
+
 // Call the addMessage function whenever data is received from the server over the WebSocket
 socket.onmessage = addMessage;
 // Allow users to send messages by pressing enter instead of clicking the Send button

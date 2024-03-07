@@ -9,10 +9,14 @@ import scala.collection.mutable.{ArrayBuffer, Map}
 import scala.util.Random
 import Backend.Views.{PageDirectories => dirs}
 
+/**This class deals with the request line, headers, and payload of all HTTP requests.
+ * It initializes the payload and facilitates buffering. Methods for parsing the specific
+ * payload are handled in the Payload object.
+ * */
 class Request(data: ByteString) {
   var (requestLine, headers, payload): (String, String, Array[Byte])  = ("", "", Array())
   var (method, path, version) = ("","","")
-  private var header_map: Map[String, String] = Map[String, String]()
+  var header_map: Map[String, String] = Map[String, String]()
 
   //Initializing
   if (Payload.isBuffering){
@@ -23,18 +27,14 @@ class Request(data: ByteString) {
     val (m, pa, v) = parse_request_line(requestLine)
     method = m; path = pa; version = v
     val h_map: Map[String, String] = put_headers_in_map(headers)
-    header_map =h_map
+    header_map = h_map
     if (method == "POST"){
-      Payload.buffer ++ payload
-      Payload.bytesLeftToRead = header_map("Content-Length").toInt
-      Payload.boundary = "--" + header_map("Content-Type").split("=")(1)
-      Payload.isBuffering = (Payload.bytesLeftToRead > 0)
+      init_payload()
     }
-
   }
 
   /** Takes in data sent over the tcp socket and splits it into request line, header, and payload bytes*/
-  def parse_request_bytes(data: ByteString): (String, String, Array[Byte]) = {
+  private def parse_request_bytes(data: ByteString): (String, String, Array[Byte]) = {
     val newline = "\r\n".getBytes()
     val double_newline = "\r\n\r\n".getBytes()
     val data_array = data.to[Array]
@@ -56,13 +56,17 @@ class Request(data: ByteString) {
   }
 
   /** Takes the bytes of the request line and splits it into request method, path, and version*/
-  def parse_request_line(request_line: String): (String, String, String) = {
+  private def parse_request_line(request_line: String): (String, String, String) = {
+    println("request line: " + request_line)
     val request_line_array = request_line.split(' ')
+    if (request_line_array.length != 3){
+      return ("","","")
+    }
     (request_line_array(0), request_line_array(1), request_line_array(2))
   }
 
   /** Puts the headers into an easy to use map data structure */
-  def put_headers_in_map(headers: String): Map[String, String] = {
+  private def put_headers_in_map(headers: String): Map[String, String] = {
     val headerLines: Array[String] = headers.split("\r\n")
     val header_map = Map[String, String]()
     var arraySplit = Array("")
@@ -75,14 +79,29 @@ class Request(data: ByteString) {
     header_map
   }
 
+  /** Sets the initial values of the post request payload using the initial HTTP Request*/
+  private def init_payload(): Unit = {
+    Payload.buffer = Payload.buffer ++ ByteString(payload)
+    Payload.bytesLeftToRead = header_map("Content-Length").toInt - payload.length
+    Payload.boundary = "--" + header_map("Content-Type").split("=")(1)
+    Payload.isBuffering = (Payload.bytesLeftToRead > 0)
+    Payload.path = path
+    Payload.method = method
+  }
+
 }
 
+/**An object encompassing the payload of an HTTP request. Allows for buffering to take place for
+ * large file uploads.
+ * */
 object Payload{
   var bytesLeftToRead: Int = 0 //this will be set to the content length aka the # of bytes
   var isBuffering = false
   var buffer: ByteString = ByteString()
   var boundary: String  = ""
   var fieldNameToBytes: Map[String, ArrayBuffer[Byte]] = Map[String, ArrayBuffer[Byte]]()
+  var path: String = ""
+  var method: String = ""
 
   /** Appends the bytes of the request to the request buffer and updates
    * bytesLeftToRead.
@@ -208,6 +227,8 @@ object Payload{
     buffer = ByteString()
     boundary = ""
     fieldNameToBytes = Map[String, ArrayBuffer[Byte]]()
+    method = ""
+    path = ""
   }
 
 

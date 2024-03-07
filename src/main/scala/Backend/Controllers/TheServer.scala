@@ -2,28 +2,23 @@ package Backend.Controllers
 
 //TODO make sure the package is correct
 import java.io.{ByteArrayInputStream, File}
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
+
 import java.net.InetSocketAddress
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
-
-import javax.imageio.ImageIO
-
-import scala.collection.mutable.{ArrayBuffer, ListBuffer, Map}
-import scala.io.Source
-import scala.util.Random
-import Backend.Models.{security=> sec}
 import Backend.Models.{HttpResponse => response}
-import Backend.Models.{HttpRequest => request}
 import Backend.Models.{Database => database}
 import Backend.Models.{StringProcessing => StrProcessing}
 import Backend.Models.{SaveFormInfo => forms}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
-import Backend.Models.{Request}
+import Backend.Models.Request
+import Backend.Models.Payload
+import Backend.Models.Websocket
+
+import scala.collection.mutable.Set
+
 
 // source: https://doc.akka.io/docs/akka/current/io-tcp.html
 // source: https://www.geeksforgeeks.org/java-program-to-convert-file-to-a-byte-array/
@@ -36,17 +31,18 @@ class TheServer extends Actor {
   import Tcp._
   import context.system
 
+  private val webSocketActors: Set[ActorRef] = Set[ActorRef]()
+
+
+
+  // The TCP manager (which is an actor) handles all low level I/O resources.
+  // The TCP manager issues the syscalls to the OS which are responsible for sending and receiving datagrams (packets) and
+  // establishing the status of connections
+  private val manager = IO(Tcp)
+  //Sends a message to the TCP manager to bind the Actor to the address:port, which will now listen for incoming TCP connections
+  //at the address:port
   //TODO change this to "0.0.0.0" for docker and port 8000
-  IO(Tcp) ! Bind(self, new InetSocketAddress("0.0.0.0", 8001))
-
-  //val imageNames = ListBuffer("cat.jpg","dog.jpg", "eagle.jpg", "elephant.jpg", "flamingo.jpg", "kitten.jpg", "parrot.jpg", "rabbit.jpg") //HW1 Code
-
-  var reqType: String = ""
-  var reqPath: String = ""
-
-  //val htmlClientNames = new StringBuilder("")
-  //val htmlClientImages = new StringBuilder("")
-  //val tokens = new ListBuffer[String]()
+   manager ! Bind(self, new InetSocketAddress("0.0.0.0", 8001))
 
   def receive = {
     case b: Bound => println("Listening on Port " + b.localAddress.getPort)
@@ -58,27 +54,19 @@ class TheServer extends Actor {
       sender() ! Register(self)
 
     case r: Received =>
-      if(!request.isBuffering){
-        println(r.data.utf8String) //debugging line
-
-        //TODO change this to an abstract HTTPRequest class
-        val (rType, rPath) = request.get_type_path(r.data)
-        reqType = rType
-        reqPath = rPath
-
-        if(reqType == "POST"){
-          // create new request object
-          request.process_initial_post(r.data)
-        }
-      }else{
-        //appends additional data to our requestBuffer
-        request.append_to_buffer(r.data)
+      //In this context sender() refers to whoever sent the Received message to TheWebserver Actor.
+      //In this case the sender() is the client.
+      println("----|start|----")
+      val req = new Request(r.data)
+      if(!Payload.isBuffering){
+        println(sender())
+        println("----|end|----")
+        println("\n")
+        //print(r.data.utf8String)
       }
 
-      //we should do all the parsing here
-      //This is what we send at the end
-      if(!request.isBuffering && reqType == "POST"){
-        reqPath match {
+      if(!Payload.isBuffering && Payload.method == "POST"){
+        Payload.path match {
           case "/image-upload"=>
             val success = forms.save_image_upload_form_data()
             if(success){
@@ -104,8 +92,8 @@ class TheServer extends Actor {
       }
 
       //GET requests are the only reqType for HW1
-      if(reqType == "GET"){
-        reqPath match {
+      if(req.method == "GET"){
+        req.path match {
           case "/" =>
             val content = templating.populate_index_template()
             sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
@@ -125,14 +113,14 @@ class TheServer extends Actor {
             sender() ! Write(response.buildOKResponseBytes("text/plain; charset=utf-8", content))
           case path if path.length > "/MultiImageView/image".length && path.substring(0, "/MultiImageView/image".length) == "/MultiImageView/image" && database.imageNames.contains(path.substring("/MultiImageView/image".length + 1)) =>
             //http://localhost:8002/image/kitten.jpg
-            val content = response.readFile(dirs.images + reqPath.substring("/MultiImageView/image".length), true)
+            val content = response.readFile(dirs.images + req.path.substring("/MultiImageView/image".length), true)
             sender() ! Write(response.buildOKResponseBytes("image/jpeg", content))
           case path if path.length > 13 && path.substring(0, 13) == "/clientPhotos" && database.imageNames.contains(path.substring(14)) =>
             //http://localhost:8002/image/kitten.jpg
-            val content = response.readFile(dirs.clientPhotos + reqPath.substring(13), true)
+            val content = response.readFile(dirs.clientPhotos + req.path.substring(13), true)
             sender() ! Write(response.buildOKResponseBytes("image/jpeg", content))
           case path if path.length > 7 && path.substring(0, 7) == "/images" =>
-            val m = StrProcessing.process_query_string(reqPath)
+            val m = StrProcessing.process_query_string(req.path)
             val content = templating.populate_imageView_template(m)
             if (content == null){
               sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
@@ -148,10 +136,11 @@ class TheServer extends Actor {
             val content = response.readFile(dirs.globalChatFunctions_js, false)
             sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
           case "/websocket" =>
-          //Get Sec-WebSocket-Key header
-          //Append GUID to the header key
-          //Computes the SHA -1 hash of this and base 64 encoding
-          // Server sends an HTTP response with the headers
+            if (!webSocketActors.contains(sender())){
+              val accept_key = Websocket.get_websocket_accept_key(req)
+              sender() ! Write(response.buildWebsocketUpgradeResponse(accept_key))
+              webSocketActors += sender()
+            }
           case _ =>
             //http://localhost:8002/dsfsdf
             //404 Not Found

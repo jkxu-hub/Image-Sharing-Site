@@ -54,4 +54,14 @@ object HttpResponse {
     response += "\r\n" //these are the two \r\n that separate header from body
     response
   }
+
+  def buildWebsocketUpgradeResponse(accept_key: String): ByteString = {
+    var response = ""
+    response += "HTTP/1.1 " + "101" + "\r\n"
+    response += "Connection: Upgrade\r\n"
+    response += "Upgrade: websocket\r\n"
+    response += "Sec-WebSocket-Accept: " + accept_key + "\r\n"
+    response += "\r\n"
+    ByteString(response)
+  }
 }
