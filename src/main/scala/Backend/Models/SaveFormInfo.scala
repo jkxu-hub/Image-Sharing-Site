@@ -1,7 +1,9 @@
 package Backend.Models
 
 import scala.collection.mutable.{ArrayBuffer, Map}
-import Backend.Models.{security=> sec}
+import Backend.Models.{security => sec}
+
+import java.nio.charset.StandardCharsets
 //import Backend.Models.{HttpRequest => request}
 import Backend.Models.{Database => database}
 import Backend.Models.{Payload}
@@ -58,6 +60,28 @@ object SaveFormInfo {
       Payload.reset_fields()
       false
     }
+  }
+
+  /** Takes in a byte array which contains the json message sent by the client. And sanitizes
+   * it from html and sql injections.
+   *
+   * @param payload a byte array which contains the json message sent by the client.
+   * @return The byte array with the sanitized json data.
+   * */
+  def save_chat_message_data(payload: Array[Byte]): Array[Byte] = {
+    val payload_str = new String(payload, StandardCharsets.UTF_8)
+    // extract json of payload str
+    val json: ujson.Value = ujson.read(payload_str)
+    // sanitize the extracted json
+    val username = sec.htmlInjectionReplace(json("username").str)
+    val comment = sec.htmlInjectionReplace(json("comment").str)
+    // TODO sanitize to prevent sql injection
+    // TODO insert json str into database
+    // re-serialize the values
+    json("username") = username
+    json("comment") = comment
+    val result_json = ujson.write(json)
+    result_json.getBytes() // return byte array of json
   }
 
 }

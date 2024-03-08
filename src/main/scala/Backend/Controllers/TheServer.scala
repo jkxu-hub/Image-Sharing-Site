@@ -16,8 +16,11 @@ import Backend.Views.{PageDirectories => dirs}
 import Backend.Models.Request
 import Backend.Models.Payload
 import Backend.Models.Websocket
+import Backend.Models.WebsocketResponse
 
-import scala.collection.mutable.Set
+import java.nio.charset.StandardCharsets
+import scala.collection.mutable.{Set}
+import Backend.Models.{security=> sec}
 
 
 // source: https://doc.akka.io/docs/akka/current/io-tcp.html
@@ -48,6 +51,7 @@ class TheServer extends Actor {
     case b: Bound => println("Listening on Port " + b.localAddress.getPort)
 
     case PeerClosed => println("Connection Closed: " + sender())
+    //TODO removeWebSocket Actor?
 
     case c: Connected =>
       println("Client Connected: " + sender() + " (" + c.remoteAddress + ")")
@@ -89,10 +93,7 @@ class TheServer extends Actor {
           case _ =>
             sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
         }
-      }
-
-      //GET requests are the only reqType for HW1
-      if(req.method == "GET"){
+      }else if (req.method == "GET"){
         req.path match {
           case "/" =>
             val content = templating.populate_index_template()
@@ -146,10 +147,46 @@ class TheServer extends Actor {
             //404 Not Found
             sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
         }
+      }else if (webSocketActors.contains(sender())){ //signifies websocket connection
+        // extract opcode
+        val opcode = Websocket.get_opcode(r.data)
+        opcode match {
+          case Websocket.text_opcode =>
+            //TODO limit the size of the message that can be sent over
+            // extract payload
+            val payload = Websocket.extract_payload_text(r.data)
+            val sanitized_payload = forms.save_chat_message_data(payload)
+            // build response with the sanitized payload
+            val response_frame = WebsocketResponse.buildTextResponseFrame(sanitized_payload)
+            // send response to all websocket connections
+            webSocketActors.foreach(connection => connection ! Write(ByteString(response_frame)))
+            // how does the database work to display the websocket information?
+          case Websocket.close_connection_opcode =>
+            // send a close response to the sender()
+            sender() ! Write(ByteString(WebsocketResponse.buildCloseResponseFrame()))
+            // remove the sender() from the list of webSocket actors
+            webSocketActors -= sender()
+            //connection close frame
+            self ! PeerClosed
+          case _ => //TODO add additional opcode handling
+            // remove the sender() from the list of webSocket actors
+            webSocketActors -= sender()
+            //connection close frame
+            self ! PeerClosed
+        }
+        //if opcode == 1, then text frame
+        //if opcode == 2, then binary frame
+        //if opcode == 8, then connection close frame
+        //if opcode == 9, ping frame
+        //if opcode == 10, pong frame
+      }else{
+        //Neither get, post, or websocket connection
+        if (!Payload.isBuffering){
+          sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+        }
       }
   }
 }
-
 
 object TheServer {
   def main(args: Array[String]): Unit = {

@@ -1,13 +1,5 @@
 // Establish a WebSocket connection with the server
-
-const socket = new WebSocket('ws://' + window.location.host + '/websocket');
-
-
-function getProtocol() {
-    if (socket.readyState === WebSocket.OPEN) {
-        alert("Websocket is working")
-    }
-}
+socket = new WebSocket('ws://' + window.location.host + '/websocket');
 
 // Call the addMessage function whenever data is received from the server over the WebSocket
 socket.onmessage = addMessage;
@@ -21,6 +13,7 @@ document.addEventListener("keypress", function (event) {
 // Read the name/comment the user is sending to chat and send it to the server over the WebSocket as a JSON string
 // Called whenever the user clicks the Send button or pressed enter
 function sendMessage() {
+    //TODO limit the size of the message that can be sent over
     const chatName = document.getElementById("chat-name").value;
     const chatBox = document.getElementById("chat-comment");
     const comment = chatBox.value;
