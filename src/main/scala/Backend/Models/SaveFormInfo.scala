@@ -68,15 +68,15 @@ object SaveFormInfo {
    * @param payload a byte array which contains the json message sent by the client.
    * @return The byte array with the sanitized json data.
    * */
-  def save_chat_message_data(payload: Array[Byte]): Array[Byte] = {
+  def save_chat_message_data(payload: Array[Byte], database_u: Database_Updated): Array[Byte] = {
     val payload_str = new String(payload, StandardCharsets.UTF_8)
     // extract json of payload str
     val json: ujson.Value = ujson.read(payload_str)
     // sanitize the extracted json
     val username = sec.htmlInjectionReplace(json("username").str)
-    val comment = sec.htmlInjectionReplace(json("comment").str)
-    // TODO sanitize to prevent sql injection
-    // TODO insert json str into database
+    val comment = sec.htmlInjectionReplace(json("comment").str) //TODO rename this to message
+    // Insert username and comment into database
+    database_u.insertMessage(username, comment)
     // re-serialize the values
     json("username") = username
     json("comment") = comment

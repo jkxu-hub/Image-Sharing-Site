@@ -7,20 +7,12 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import java.net.InetSocketAddress
-import Backend.Models.{HttpResponse => response}
-import Backend.Models.{Database => database}
-import Backend.Models.{StringProcessing => StrProcessing}
-import Backend.Models.{SaveFormInfo => forms}
+import Backend.Models.{Database_Updated, Payload, Request, Websocket, WebsocketResponse, Database => database, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
-import Backend.Models.Request
-import Backend.Models.Payload
-import Backend.Models.Websocket
-import Backend.Models.WebsocketResponse
 
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.{Set}
-import Backend.Models.{security=> sec}
+import scala.collection.mutable.Set
 
 
 // source: https://doc.akka.io/docs/akka/current/io-tcp.html
@@ -34,9 +26,8 @@ class TheServer extends Actor {
   import Tcp._
   import context.system
 
-  private val webSocketActors: Set[ActorRef] = Set[ActorRef]()
-
-
+  private val webSocketActors: Set[ActorRef] = Set[ActorRef]() //TODO change name to websocket connections
+  val database_u = new Database_Updated
 
   // The TCP manager (which is an actor) handles all low level I/O resources.
   // The TCP manager issues the syscalls to the OS which are responsible for sending and receiving datagrams (packets) and
@@ -45,7 +36,7 @@ class TheServer extends Actor {
   //Sends a message to the TCP manager to bind the Actor to the address:port, which will now listen for incoming TCP connections
   //at the address:port
   //TODO change this to "0.0.0.0" for docker and port 8000
-   manager ! Bind(self, new InetSocketAddress("0.0.0.0", 8001))
+   manager ! Bind(self, new InetSocketAddress("0.0.0.0", 8000))
 
   def receive = {
     case b: Bound => println("Listening on Port " + b.localAddress.getPort)
@@ -129,8 +120,7 @@ class TheServer extends Actor {
               sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
             }
           case "/global-chat" =>
-            val bufferedSource = scala.io.Source.fromFile(dirs.globalChatPage)
-            val content = bufferedSource.mkString
+            val content = templating.populate_global_chat_page(database_u)
             sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
           case "/globalChatFunctions.js" =>
             //TODO is this a security concern. Users can see the entirety of functions.js.
@@ -155,7 +145,7 @@ class TheServer extends Actor {
             //TODO limit the size of the message that can be sent over
             // extract payload
             val payload = Websocket.extract_payload_text(r.data)
-            val sanitized_payload = forms.save_chat_message_data(payload)
+            val sanitized_payload = forms.save_chat_message_data(payload,database_u)
             // build response with the sanitized payload
             val response_frame = WebsocketResponse.buildTextResponseFrame(sanitized_payload)
             // send response to all websocket connections

@@ -33,7 +33,6 @@ class Test_HttpRequest extends AnyFunSuite{
     assert(req.version === "HTTP/1.1")
   }
 
-
   test("Normal GET Request") {
     assert(3 === 3)
   }

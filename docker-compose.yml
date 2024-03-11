@@ -1,0 +1,23 @@
+# citation
+version: '3.3'
+services:
+  mysql: # change this for SQL, make sure it matches the WAIT_HOST
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 'changeme'
+      MYSQL_DATABASE: 'todo'
+      # these two below are optional
+      MYSQL_USER: 'sqluser'
+      MYSQL_PASSWORD: 'changeme'
+  app:
+    build: . #the dot specifies the file is in the same directory as the .yml file
+    environment:
+      WAIT_HOSTS: mysql:3306 # change this to SQL and associate port number
+      # for SQL set variables for username and password
+      DEV_DB_USERNAME: 'sqluser'
+      DEV_DB_PASSWORD: 'changeme'
+    ports:
+      - '8080:8000'
+
+# note of caution if you change the environment variables after you build image, you have to rebuild image
+# docker-compose up -d

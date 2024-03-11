@@ -6,8 +6,13 @@ RUN unzip sbt-$SBT_VERSION.zip -d ops
 WORKDIR /Site
 COPY . /Site
 
-EXPOSE 8001
-CMD /ops/sbt/bin/sbt run
+EXPOSE 8000
+
+# waits for the database to startup before the app
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.2.1/wait /wait
+RUN chmod +x /wait
+
+CMD /wait && /ops/sbt/bin/sbt run
 
 #docker build -t image_sharing_site_new .
 #docker run --publish 8006:8001 --name image_sharing_site_new image_sharing_site_new
