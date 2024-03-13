@@ -2,11 +2,11 @@ package Backend.Models
 import java.sql.{Connection, DriverManager, ResultSet}
 import scala.collection.mutable.ArrayBuffer
 
-class Database_Updated {
+object Database_Updated {
   //TODO: change to these values for docker (instead of "localhost" change it to the name of the service)
 
-  private val db_url = "jdbc:mysql://mysql:3306/todo" //TODO Change for DOCKER
-  //private val db_url = "jdbc:mysql://localhost:3306/imagesharingbase"
+  //private val db_url = "jdbc:mysql://mysql:3306/todo" //TODO Change for DOCKER
+  private val db_url = "jdbc:mysql://localhost:3306/imagesharingbase"
   private val db_username: String = sys.env("DEV_DB_USERNAME")
   private val db_password: String = sys.env("DEV_DB_PASSWORD")
   private val connection: Connection = DriverManager.getConnection(db_url, db_username, db_password)

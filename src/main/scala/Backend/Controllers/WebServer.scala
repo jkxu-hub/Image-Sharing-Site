@@ -1,6 +1,6 @@
 package Backend.Controllers
 
-//TODO make sure the package is correct
+
 import java.io.{ByteArrayInputStream, File}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.io.{IO, Tcp}
@@ -15,40 +15,16 @@ import java.nio.charset.StandardCharsets
 import scala.collection.mutable.Set
 
 
-// source: https://doc.akka.io/docs/akka/current/io-tcp.html
-// source: https://www.geeksforgeeks.org/java-program-to-convert-file-to-a-byte-array/
-// source: https://www.youtube.com/watch?v=qB3O9gjp1gI&list=PLOLBRzMrfILfSA4w3ObCOK9CSTPkgSXgl&index=8
-
-//2.12.10
-//2.13.3
-class TheServer extends Actor {
-
+/** Handles reads and writes from client processes. Each WebServer Actor is a assigned a single client.
+ * Once that client process closes and sends a PeerClosed message, the Actor closes as well.
+ * */
+class WebServer extends Actor {
   import Tcp._
-  import context.system
-
-  private val webSocketActors: Set[ActorRef] = Set[ActorRef]() //TODO change name to websocket connections
-
-  // The TCP manager (which is an actor) handles all low level I/O resources.
-  // The TCP manager issues the syscalls to the OS which are responsible for sending and receiving datagrams (packets) and
-  // establishing the status of connections
-  private val manager = IO(Tcp)
-  //Sends a message to the TCP manager to bind the Actor to the address:port, which will now listen for incoming TCP connections
-  //at the address:port
-  //TODO change this to "0.0.0.0" for docker and port 8000
-   manager ! Bind(self, new InetSocketAddress("0.0.0.0", 8000))
 
   def receive = {
-    case b: Bound => println("Listening on Port " + b.localAddress.getPort)
-
     case PeerClosed => println("Connection Closed: " + sender())
-    //context.stop(self)
-    //TODO removeWebSocket Actor?
-
-    case c: Connected =>
-      //println("Client Connected: " + sender() + " (" + c.remoteAddress + ")")
-      sender() ! Register(self)
-
     case r: Received =>
+      /*
       //In this context sender() refers to whoever sent the Received message to TheWebserver Actor.
       //In this case the sender() is the client.
       print(sender())
@@ -85,7 +61,7 @@ class TheServer extends Actor {
         //if opcode == 8, then connection close frame
         //if opcode == 9, ping frame
         //if opcode == 10, pong frame
-      }else{
+      } else {
         print(" HTTP ")
         val req = new Request(r.data)
         if (!Payload.isBuffering && Payload.method == "POST") {
@@ -168,13 +144,8 @@ class TheServer extends Actor {
         }
 
       }
-  }
-}
 
-object TheServer {
-  def main(args: Array[String]): Unit = {
-    val actorSystem = ActorSystem()
-    actorSystem.actorOf(Props(classOf[TheServer]))
+       */
 
   }
 }
