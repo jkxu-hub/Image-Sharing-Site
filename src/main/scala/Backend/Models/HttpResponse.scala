@@ -64,4 +64,12 @@ object HttpResponse {
     response += "\r\n"
     ByteString(response)
   }
+
+  def buildNoContentResponse(): ByteString = {
+    var response = ""
+    response += "HTTP/1.1 " + "204" + "\r\n"
+    response += "\r\n"
+    ByteString(response)
+
+  }
 }

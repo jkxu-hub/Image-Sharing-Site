@@ -13,6 +13,7 @@ import Backend.Views.{PageDirectories => dirs}
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable.Set
+import scala.util.matching.Regex
 
 
 // source: https://doc.akka.io/docs/akka/current/io-tcp.html
@@ -51,7 +52,11 @@ class TheServer extends Actor {
     case r: Received =>
       //In this context sender() refers to whoever sent the Received message to TheWebserver Actor.
       //In this case the sender() is the client.
-      print(sender())
+      //print(sender())
+      if(!Payload.isBuffering){
+        //println(r.data.utf8String)
+      }
+
       if (webSocketActors.contains(sender())) { //signifies websocket connection
         print(" WEBSOCKET ")
         // extract opcode
@@ -109,6 +114,16 @@ class TheServer extends Actor {
               } else {
                 sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
               }
+            case "/users" =>
+              // extract payload
+              val payload_str = Payload.buffer.utf8String
+              val json: ujson.Value = ujson.read(payload_str)
+              // sanitize the extracted json
+              val email = sec.htmlInjectionReplace(json("email").str)
+              val username = sec.htmlInjectionReplace(json("username").str)
+              val json_ret = database_u.insertNewUser(username, email)
+              sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
+
             case _ =>
               sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
           }
@@ -160,11 +175,58 @@ class TheServer extends Actor {
                 sender() ! Write(response.buildWebsocketUpgradeResponse(accept_key))
                 webSocketActors += sender()
               }
+            case "/users" =>
+              val json_ret = database_u.listAllUsers()
+              sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
+            case path if path.matches("\\/users\\/\\d+") =>
+              val id = path.substring("/users/".length).toInt
+              val json_ret = database_u.listSingleUser(id)
+              if(json_ret == ""){
+                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+              }else{
+                sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
+              }
             case _ =>
-              //http://localhost:8002/dsfsdf
               //404 Not Found
               sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
           }
+        } else if (!Payload.isBuffering && Payload.method == "PUT"){
+          Payload.path match {
+            case path if path.matches("\\/users\\/\\d+") =>
+              val id = path.substring("/users/".length).toInt
+              val payload_str = Payload.buffer.utf8String
+              println(payload_str)
+              val json: ujson.Value = ujson.read(payload_str)
+              // sanitize the extracted json
+              val email = sec.htmlInjectionReplace(json("email").str)
+              val username = sec.htmlInjectionReplace(json("username").str)
+
+              val json_ret = database_u.updateUserEntry(id, username, email)
+              if (json_ret == "") {
+                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+              } else {
+                sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
+              }
+              Payload.reset_fields()
+            case _ =>
+              sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+          }
+
+        } else if(req.method == "DELETE"){
+          req.path match {
+            case path if path.matches("\\/users\\/\\d+") =>
+              val id = path.substring("/users/".length).toInt
+              val success = database_u.deleteUser(id)
+              if (success){
+                sender() ! Write(response.buildNoContentResponse())
+              }else{
+                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+              }
+            case _ =>
+              sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
+
+          }
+
         }
 
       }
