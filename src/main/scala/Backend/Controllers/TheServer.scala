@@ -7,12 +7,12 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import java.net.InetSocketAddress
-import Backend.Models.{Database_Updated => database_u, Payload, Request, Websocket, WebsocketResponse, Database => database, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
+import Backend.Models.{Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
 
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.Set
+import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.util.matching.Regex
 
 
@@ -130,8 +130,26 @@ class TheServer extends Actor {
         } else if (req.method == "GET") {
           req.path match {
             case "/" =>
-              val content = templating.populate_index_template()
-              sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
+              val cookies = ArrayBuffer[String]()
+              if(!req.header_map.contains("Cookie")){
+                cookies += "visits=1"
+                val content = templating.populate_index_template("1")
+                sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
+              }else{
+                val cookie_str = req.header_map("Cookie")
+                val cookie_map = StrProcessing.put_cookies_in_map(cookie_str)
+                if(cookie_map.contains("visits")){
+                  val visits = cookie_map("visits").toInt + 1
+                  //val cookies = ArrayBuffer[String]()
+                  cookies += "visits=" + visits.toString
+                  val content = templating.populate_index_template(visits.toString)
+                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
+
+                }else{
+                  val content = templating.populate_index_template("")
+                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
+                }
+              }
             case "/hello" =>
               sender() ! Write(response.buildOKResponseString("text/plain", "ni hao world"))
             case "/hi" =>
