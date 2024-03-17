@@ -41,5 +41,5 @@ build/
 .bsp/
 .idea/
 project/target
-/src/scala/Frontend/clientPhotos
+src/main/scala/Frontend/clientPhotos/
 
