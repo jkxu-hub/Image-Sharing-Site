@@ -1,12 +1,13 @@
 package Backend.Models
-import java.sql.{Connection, DriverManager, ResultSet}
+import java.sql.{Connection, DriverManager, ResultSet, SQLException}
 import scala.collection.mutable.ArrayBuffer
+import Backend.Models.{json_creation => json_create}
 
-class Database_Updated {
+object Database_Updated {
   //TODO: change to these values for docker (instead of "localhost" change it to the name of the service)
 
-  private val db_url = "jdbc:mysql://mysql:3306/todo" //TODO Change for DOCKER
-  //private val db_url = "jdbc:mysql://localhost:3306/imagesharingbase"
+  //private val db_url = "jdbc:mysql://mysql:3306/todo" //TODO Change for DOCKER
+  private val db_url = "jdbc:mysql://localhost:3306/imagesharingbase"
   private val db_username: String = sys.env("DEV_DB_USERNAME")
   private val db_password: String = sys.env("DEV_DB_PASSWORD")
   private val connection: Connection = DriverManager.getConnection(db_url, db_username, db_password)
@@ -17,10 +18,114 @@ class Database_Updated {
   private def init_database(): Unit = {
     //TODO do you need to create the database here?
     createGlobalMessagesTable()
+    createUsersTable()
+
   }
 
-  /**init_database
-   * Creates all tables needed by the database if those tables have not been created yet
+  /*---------------------- users table SQL below--------------------------*/
+  /** Creates users table. users(user_id, username, email) Called by init_database().*/
+  private def createUsersTable(): Unit = {
+    connection.createStatement().execute("CREATE TABLE IF NOT EXISTS users (user_id INT NOT NULL AUTO_INCREMENT, username VARCHAR(255), email TEXT, PRIMARY KEY (user_id), UNIQUE(username))")
+  }
+
+  /** Insert new user. Called when POST /users request is received.
+   * @return the JSON of the newly created record
+   * */
+  def insertNewUser(username: String, email: String): String = {
+    val statement = connection.prepareStatement("INSERT INTO users (username, email) VALUE (?, ?)")
+    statement.setString(1, username)
+    statement.setString(2, email)
+    statement.execute()
+    val statement2 = connection.prepareStatement("SELECT * FROM users WHERE username = ?")
+    statement2.setString(1, username)
+    val user: ResultSet = statement2.executeQuery()
+    val json_str = json_create.user_entry_string(user)
+    json_str
+  }
+
+  /** List all created users. Called when GET /users request is received by server.
+   *
+   * @return The JSON string representing all users in the table.
+   *         e.g. [{“id”:1, “email”: “firstuser@example.com”, “username”: “coolguy123”}, {“id”:2,
+   *                  “email”: “cse312@example.com”, “username”: “cse312”}]
+   * */
+  def listAllUsers(): String = {
+    val statement = connection.createStatement()
+    val result: ResultSet = statement.executeQuery("SELECT * FROM users")
+
+    val arr = ArrayBuffer[ujson.Obj]()
+    while (result.next()) {
+      val user_id = result.getString("user_id")
+      val username = result.getString("username")
+      val email = result.getString("email")
+      arr += ujson.Obj("user_id" -> user_id, "username"-> username, "email" -> email)
+    }
+    val json_str = ujson.write(arr)
+    json_str
+  }
+
+  /** List single user. Called when GET /users/id is request is received by the server.
+   *
+   * @return The JSON string representing an entry matching the id in the users table.
+   *         e.g. {“id”:2, “email”: “cse312@example.com”, “username”: “cse312”}
+   *
+   * */
+  def listSingleUser(id: Int): String = {
+    val statement = connection.prepareStatement("SELECT * FROM users WHERE user_id = ?")
+    statement.setInt(1, id)
+    val user: ResultSet = statement.executeQuery()
+    try{
+      user.next()
+      val user_id = user.getString("user_id")
+      val username = user.getString("username")
+      val email = user.getString("email")
+      val json_str = ujson.write(ujson.Obj("user_id" -> user_id, "username" -> username, "email" -> email))
+      json_str
+    }catch{
+      case s: SQLException => println(s); ""
+    }
+
+  }
+
+  /** Update user entry. Called when PUT /user/id request is received by the server.
+   *
+   * @return the JSON of the newly updated user entry.
+   * */
+  def updateUserEntry(id: Int, username: String, email: String): String = {
+    try{
+      val statement = connection.prepareStatement("UPDATE users SET username = ?, email = ? where user_id = ?")
+      statement.setString(1, username)
+      statement.setString(2, email)
+      statement.setInt(3, id)
+      statement.execute()
+      //returns the json of the updated user
+      listSingleUser(id)
+    }catch{
+      case s: SQLException => println(s); ""
+    }
+
+  }
+
+  /** Delete user. Called when DELETE /users/id is received by the server.
+   *
+   * @param id the id of the user we want to delete
+   * @return true if the user was successfully deleted otherwise, false
+   * */
+  def deleteUser(id: Int): Boolean = {
+    val statement = connection.prepareStatement("DELETE FROM users WHERE user_id = ?")
+    statement.setInt(1, id)
+    //returns the number of rows that were affected
+    if (statement.executeUpdate() == 0){
+      false
+    }else{
+      true
+    }
+  }
+
+
+
+  /*---------------------- globalMessages table SQL below--------------------------*/
+  /** creates the globalMessages table. globalMessages(user_id, username, messages).
    * */
   private def createGlobalMessagesTable(): Unit = {
     connection.createStatement().execute("CREATE TABLE IF NOT EXISTS globalMessages (username TEXT, message TEXT)")

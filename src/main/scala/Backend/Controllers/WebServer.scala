@@ -1,62 +1,33 @@
 package Backend.Controllers
 
-//TODO make sure the package is correct
+
 import java.io.{ByteArrayInputStream, File}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import java.net.InetSocketAddress
-import Backend.Models.{Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
+import Backend.Models.{Database_Updated => database_u, Payload, Request, Websocket, WebsocketResponse, Database => database, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
 
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.{ArrayBuffer, Set}
-import scala.util.matching.Regex
+import scala.collection.mutable.Set
 
 
-// source: https://doc.akka.io/docs/akka/current/io-tcp.html
-// source: https://www.geeksforgeeks.org/java-program-to-convert-file-to-a-byte-array/
-// source: https://www.youtube.com/watch?v=qB3O9gjp1gI&list=PLOLBRzMrfILfSA4w3ObCOK9CSTPkgSXgl&index=8
-
-//2.12.10
-//2.13.3
-class TheServer extends Actor {
-
+/** Handles reads and writes from client processes. Each WebServer Actor is a assigned a single client.
+ * Once that client process closes and sends a PeerClosed message, the Actor closes as well.
+ * */
+class WebServer extends Actor {
   import Tcp._
-  import context.system
-
-  private val webSocketActors: Set[ActorRef] = Set[ActorRef]() //TODO change name to websocket connections
-
-  // The TCP manager (which is an actor) handles all low level I/O resources.
-  // The TCP manager issues the syscalls to the OS which are responsible for sending and receiving datagrams (packets) and
-  // establishing the status of connections
-  private val manager = IO(Tcp)
-  //Sends a message to the TCP manager to bind the Actor to the address:port, which will now listen for incoming TCP connections
-  //at the address:port
-  //TODO change this to "0.0.0.0" for docker and port 8000
-   manager ! Bind(self, new InetSocketAddress("0.0.0.0", 8000))
 
   def receive = {
-    case b: Bound => println("Listening on Port " + b.localAddress.getPort)
-
     case PeerClosed => println("Connection Closed: " + sender())
-    //context.stop(self)
-    //TODO removeWebSocket Actor?
-
-    case c: Connected =>
-      //println("Client Connected: " + sender() + " (" + c.remoteAddress + ")")
-      sender() ! Register(self)
-
     case r: Received =>
+      /*
       //In this context sender() refers to whoever sent the Received message to TheWebserver Actor.
       //In this case the sender() is the client.
-      //print(sender())
-      if(!Payload.isBuffering){
-        //println(r.data.utf8String)
-      }
-
+      print(sender())
       if (webSocketActors.contains(sender())) { //signifies websocket connection
         print(" WEBSOCKET ")
         // extract opcode
@@ -90,7 +61,7 @@ class TheServer extends Actor {
         //if opcode == 8, then connection close frame
         //if opcode == 9, ping frame
         //if opcode == 10, pong frame
-      }else{
+      } else {
         print(" HTTP ")
         val req = new Request(r.data)
         if (!Payload.isBuffering && Payload.method == "POST") {
@@ -114,42 +85,14 @@ class TheServer extends Actor {
               } else {
                 sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
               }
-            case "/users" =>
-              // extract payload
-              val payload_str = Payload.buffer.utf8String
-              val json: ujson.Value = ujson.read(payload_str)
-              // sanitize the extracted json
-              val email = sec.htmlInjectionReplace(json("email").str)
-              val username = sec.htmlInjectionReplace(json("username").str)
-              val json_ret = database_u.insertNewUser(username, email)
-              sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
-
             case _ =>
               sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
           }
         } else if (req.method == "GET") {
           req.path match {
             case "/" =>
-              val cookies = ArrayBuffer[String]()
-              if(!req.header_map.contains("Cookie")){
-                cookies += "visits=1"
-                val content = templating.populate_index_template("1")
-                sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-              }else{
-                val cookie_str = req.header_map("Cookie")
-                val cookie_map = StrProcessing.put_cookies_in_map(cookie_str)
-                if(cookie_map.contains("visits")){
-                  val visits = cookie_map("visits").toInt + 1
-                  //val cookies = ArrayBuffer[String]()
-                  cookies += "visits=" + visits.toString
-                  val content = templating.populate_index_template(visits.toString)
-                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-
-                }else{
-                  val content = templating.populate_index_template("")
-                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-                }
-              }
+              val content = templating.populate_index_template()
+              sender() ! Write(response.buildOKResponseBytes("text/html", ByteString(content)))
             case "/hello" =>
               sender() ! Write(response.buildOKResponseString("text/plain", "ni hao world"))
             case "/hi" =>
@@ -193,68 +136,16 @@ class TheServer extends Actor {
                 sender() ! Write(response.buildWebsocketUpgradeResponse(accept_key))
                 webSocketActors += sender()
               }
-            case "/users" =>
-              val json_ret = database_u.listAllUsers()
-              sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
-            case path if path.matches("\\/users\\/\\d+") =>
-              val id = path.substring("/users/".length).toInt
-              val json_ret = database_u.listSingleUser(id)
-              if(json_ret == ""){
-                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-              }else{
-                sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
-              }
             case _ =>
+              //http://localhost:8002/dsfsdf
               //404 Not Found
               sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
           }
-        } else if (!Payload.isBuffering && Payload.method == "PUT"){
-          Payload.path match {
-            case path if path.matches("\\/users\\/\\d+") =>
-              val id = path.substring("/users/".length).toInt
-              val payload_str = Payload.buffer.utf8String
-              println(payload_str)
-              val json: ujson.Value = ujson.read(payload_str)
-              // sanitize the extracted json
-              val email = sec.htmlInjectionReplace(json("email").str)
-              val username = sec.htmlInjectionReplace(json("username").str)
-
-              val json_ret = database_u.updateUserEntry(id, username, email)
-              if (json_ret == "") {
-                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-              } else {
-                sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
-              }
-              Payload.reset_fields()
-            case _ =>
-              sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-          }
-
-        } else if(req.method == "DELETE"){
-          req.path match {
-            case path if path.matches("\\/users\\/\\d+") =>
-              val id = path.substring("/users/".length).toInt
-              val success = database_u.deleteUser(id)
-              if (success){
-                sender() ! Write(response.buildNoContentResponse())
-              }else{
-                sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-              }
-            case _ =>
-              sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-
-          }
-
         }
 
       }
-  }
-}
 
-object TheServer {
-  def main(args: Array[String]): Unit = {
-    val actorSystem = ActorSystem()
-    actorSystem.actorOf(Props(classOf[TheServer]))
+       */
 
   }
 }

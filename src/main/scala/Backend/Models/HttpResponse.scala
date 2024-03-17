@@ -1,7 +1,9 @@
 package Backend.Models
 
 import akka.util.ByteString
+
 import java.nio.file.{Files, Paths}
+import scala.collection.mutable.{ArrayBuffer}
 /** Contains methods for creating http responses*/
 object HttpResponse {
   def buildOKResponseString(mimeType: String, content: String): ByteString = {
@@ -63,5 +65,27 @@ object HttpResponse {
     response += "Sec-WebSocket-Accept: " + accept_key + "\r\n"
     response += "\r\n"
     ByteString(response)
+  }
+
+  def buildNoContentResponse(): ByteString = {
+    var response = ""
+    response += "HTTP/1.1 " + "204" + "\r\n"
+    response += "\r\n"
+    ByteString(response)
+
+  }
+
+  def buildOKResponseBytesNCookies(mimeType: String, content: ByteString, cookies: ArrayBuffer[String]): ByteString = {
+    var response = ""
+    response += "HTTP/1.1 " + "200 OK" + "\r\n"
+    response += "Content-Type: " + mimeType + "\r\n"
+    response += "X-Content-Type-Options: nosniff\r\n"
+
+    for (cookie <- cookies) {
+      response += "Set-Cookie: " + cookie + "; Max-Age=36000; HttpOnly" + "\r\n"
+    }
+    response += "Content-Length: " + content.length.toString + "\r\n"
+    response += "\r\n" //these are the two \r\n that separate header from body
+    ByteString(response) ++ content
   }
 }

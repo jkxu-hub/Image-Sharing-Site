@@ -40,6 +40,17 @@ object StringProcessing {
     q_map
   }
 
+  def put_cookies_in_map(cookies: String): Map[String, String] = {
+    val arr = cookies.split("; ")
+    val cookie_map = Map[String, String]()
+    for(elem <- arr){
+      val tup = elem.split("=")
+      cookie_map(tup(0)) = tup(1)
+    }
+    cookie_map
+
+  }
+
 
   /**
    * a method that parses the query string

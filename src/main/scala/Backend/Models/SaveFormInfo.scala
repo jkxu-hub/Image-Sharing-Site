@@ -5,7 +5,7 @@ import Backend.Models.{security => sec}
 
 import java.nio.charset.StandardCharsets
 //import Backend.Models.{HttpRequest => request}
-import Backend.Models.{Database => database}
+import Backend.Models.{Database => database, Database_Updated => database_u}
 import Backend.Models.{Payload}
 
 object SaveFormInfo {
@@ -68,7 +68,7 @@ object SaveFormInfo {
    * @param payload a byte array which contains the json message sent by the client.
    * @return The byte array with the sanitized json data.
    * */
-  def save_chat_message_data(payload: Array[Byte], database_u: Database_Updated): Array[Byte] = {
+  def save_chat_message_data(payload: Array[Byte]): Array[Byte] = {
     val payload_str = new String(payload, StandardCharsets.UTF_8)
     // extract json of payload str
     val json: ujson.Value = ujson.read(payload_str)

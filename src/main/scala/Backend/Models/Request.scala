@@ -28,7 +28,7 @@ class Request(data: ByteString) {
     method = m; path = pa; version = v
     val h_map: Map[String, String] = put_headers_in_map(headers)
     header_map = h_map
-    if (method == "POST"){
+    if (method == "POST" || method == "PUT"){
       init_payload()
     }
   }
@@ -83,7 +83,14 @@ class Request(data: ByteString) {
   private def init_payload(): Unit = {
     Payload.buffer = Payload.buffer ++ ByteString(payload)
     Payload.bytesLeftToRead = header_map("Content-Length").toInt - payload.length
-    Payload.boundary = "--" + header_map("Content-Type").split("=")(1)
+    // if(header_map("Content-Type"))
+    val content_type = header_map("Content-Type").split("; ")(0)
+    content_type match{
+      case "multipart/form-data" =>
+        Payload.boundary = "--" + header_map("Content-Type").split("=")(1)
+      case _ =>
+    }
+
     Payload.isBuffering = (Payload.bytesLeftToRead > 0)
     Payload.path = path
     Payload.method = method

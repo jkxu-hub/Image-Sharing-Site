@@ -2,12 +2,11 @@ package Backend.Views
 
 import scala.collection.mutable.{ArrayBuffer, Map}
 import scala.util.Random
-import Backend.Models.{Database_Updated, Database => database}
+import Backend.Models.{Database_Updated => database_u, Database => database}
 import Backend.Views.{PageDirectories => dirs, htmlGenerator => htmlGen}
 
 /**Should this go in models since it interacts with the database?*/
 object templating {
-
 
 
   /** populates template.html template
@@ -42,7 +41,7 @@ object templating {
    * and populates the page with the htmlClientNames and htmlClientImages.
    *
    * */
-  def populate_index_template(): String = {
+  def populate_index_template(visits_cookie: String): String = {
     val bufferedSource = scala.io.Source.fromFile(dirs.home_page)
     var content = bufferedSource.mkString
     content = content.replace("{{name}}", database.htmlClientNames)
@@ -57,6 +56,7 @@ object templating {
 
     content = content.replace("{{token1}}", randomToken1)
     content = content.replace("{{token2}}", randomToken2)
+    content = content.replace("{{visits}}", visits_cookie)
 
     content
   }
@@ -65,7 +65,7 @@ object templating {
    *
    * @return the updated contents of the global chat page in the form of a string
    * */
-  def populate_global_chat_page(database_u: Database_Updated): String = {
+  def populate_global_chat_page(): String = {
     val bufferedSource = scala.io.Source.fromFile(dirs.globalChatPage)
     var content = bufferedSource.mkString
     val allUsersAndMessages = database_u.listAllMessages()
