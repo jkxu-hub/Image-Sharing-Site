@@ -2,6 +2,7 @@ package Backend.Models
 
 import scala.collection.mutable.{ArrayBuffer, Map}
 import Backend.Models.{security => sec}
+import akka.util.ByteString
 
 import java.nio.charset.StandardCharsets
 //import Backend.Models.{HttpRequest => request}
@@ -83,5 +84,38 @@ object SaveFormInfo {
     val result_json = ujson.write(json)
     result_json.getBytes() // return byte array of json
   }
+
+  /** Saves sign up form information and/or returns status message expressing success or failure.
+   * Generates a salt and hash that will be used by the database.
+   *
+   * @param payload containing a json string with the sign up form data
+   * @return the message we want to send the user. Returns "OK" if sign up was successful.
+   * */
+  def save_sign_up(payload: ByteString): String = {
+    val json: ujson.Value = ujson.read(payload.utf8String)
+    val username = sec.htmlInjectionReplace(json("username").str)
+    if (username.length == 0 || username.length > 20) {
+      return "Username must be between 1 and 20 characters."
+    }
+    val email = sec.htmlInjectionReplace(json("email").str)
+    val password = json("password").str
+    if (!password.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^\\w\\s]).{8,}$")){
+      println("bad password")
+    }
+    val (pw_hash, pw_salt) = sec.generateHashAndSalt(password)
+    //val (tok_hash, tok_salt) = sec.generateHashAndSalt(authToken)
+
+    // if username is "", send a message that says invalid username
+    // if username already exists, send a message that username already exists
+    // TODO if password doesn't meet requirements, send a message that the password didn't meet requirements
+    // if data is successfully created (insert_authenticated_user() is successful), redirect to the homepage
+
+    val insertSuccess = database_u.insertAuthenticatedUser(username, email, pw_hash, pw_salt, null, null)
+    if(!insertSuccess){
+      return "Username already exists"
+    }
+    "OK"
+  }
+
 
 }

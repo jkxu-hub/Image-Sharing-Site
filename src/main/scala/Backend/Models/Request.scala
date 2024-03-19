@@ -8,6 +8,7 @@ import javax.imageio.ImageIO
 import scala.collection.mutable.{ArrayBuffer, Map}
 import scala.util.Random
 import Backend.Views.{PageDirectories => dirs}
+import Backend.Models.{CookieProcessing}
 
 /**This class deals with the request line, headers, and payload of all HTTP requests.
  * It initializes the payload and facilitates buffering. Methods for parsing the specific
@@ -28,6 +29,8 @@ class Request(data: ByteString) {
     method = m; path = pa; version = v
     val h_map: Map[String, String] = put_headers_in_map(headers)
     header_map = h_map
+    //TODO make cookie_map a variable of Request
+    CookieProcessing.init_cookie_map(header_map)
     if (method == "POST" || method == "PUT"){
       init_payload()
     }

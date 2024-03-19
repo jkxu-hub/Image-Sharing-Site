@@ -3,7 +3,7 @@ package Backend.Models
 import akka.util.ByteString
 
 import java.nio.file.{Files, Paths}
-import scala.collection.mutable.{ArrayBuffer}
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 /** Contains methods for creating http responses*/
 object HttpResponse {
   def buildOKResponseString(mimeType: String, content: String): ByteString = {
@@ -47,6 +47,10 @@ object HttpResponse {
     ByteString(buildResponse("403 Forbidden", mimeType, content.length) + content)
   }
 
+  def buildBadRequestResponse(mimeType: String, content: String) = {
+    ByteString(buildResponse("400 Bad Request", mimeType, content.length) + content)
+  }
+
   def buildResponse(responseCode: String, mimeType: String, contentLen: Int): String = {
     var response = ""
     response += "HTTP/1.1 " + responseCode + "\r\n"
@@ -75,7 +79,7 @@ object HttpResponse {
 
   }
 
-  def buildOKResponseBytesNCookies(mimeType: String, content: ByteString, cookies: ArrayBuffer[String]): ByteString = {
+  def buildOKResponseBytesNCookies(mimeType: String, content: ByteString, cookies: ListBuffer[String]): ByteString = {
     var response = ""
     response += "HTTP/1.1 " + "200 OK" + "\r\n"
     response += "Content-Type: " + mimeType + "\r\n"

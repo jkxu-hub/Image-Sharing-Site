@@ -14,4 +14,11 @@ object PageDirectories {
   val clientPhotos: String = frontend + "clientPhotos"
   val globalChatFunctions_js: String = frontend + "GlobalChat/globalChatFunctions.js"
 
+  val signup_html: String = frontend + "SignUp/signup.html"
+  val signup_js: String = frontend + "SignUp/signup.js"
+  val signupsuccess_html: String = frontend + "SignUp/signupSuccess.html"
+
+  val login_html: String = frontend + "Login/login.html"
+  val login_js: String = frontend + "Login/login.js"
+
 }

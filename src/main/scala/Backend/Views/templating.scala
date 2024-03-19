@@ -41,7 +41,7 @@ object templating {
    * and populates the page with the htmlClientNames and htmlClientImages.
    *
    * */
-  def populate_index_template(visits_cookie: String): String = {
+  def populate_index_template(visits_cookie: Int): String = {
     val bufferedSource = scala.io.Source.fromFile(dirs.home_page)
     var content = bufferedSource.mkString
     content = content.replace("{{name}}", database.htmlClientNames)
@@ -56,7 +56,7 @@ object templating {
 
     content = content.replace("{{token1}}", randomToken1)
     content = content.replace("{{token2}}", randomToken2)
-    content = content.replace("{{visits}}", visits_cookie)
+    content = content.replace("{{visits}}", visits_cookie.toString)
 
     content
   }

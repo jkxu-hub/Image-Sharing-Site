@@ -7,7 +7,7 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import java.net.InetSocketAddress
-import Backend.Models.{Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
+import Backend.Models.{Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec, CookieProcessing}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
 
@@ -124,32 +124,52 @@ class TheServer extends Actor {
               val json_ret = database_u.insertNewUser(username, email)
               sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
 
+            case "/signup" =>
+              println(Payload.buffer.utf8String)
+
+              val return_code = forms.save_sign_up(Payload.buffer)
+              Payload.reset_fields()
+
+              if(return_code == "OK"){
+                sender() ! Write(response.buildOKResponseString("text/plain", return_code))
+              }else{
+                sender() ! Write(response.buildBadRequestResponse("text/plain", return_code))
+              }
+
+              //TODO Set Cookies so personalized content shows on various pages.
+            case "/login" =>
+              println(Payload.buffer.utf8String)
+              val json: ujson.Value = ujson.read(Payload.buffer.utf8String)
+              val username = json("username").str
+              val password = json("password").str
+              Payload.reset_fields()
+
+              val return_code = sec.checkPasswordMatch(username, password)
+
+              if(return_code == "OK"){
+                CookieProcessing.updateAuthTokens()
+
+                // send cookies and bytes to the homepage. Redirects to the homepage.
+                sender() ! Write(response.buildOKResponseString("text/plain", return_code))
+              }else{
+                sender() ! Write(response.buildBadRequestResponse("text/plain", return_code))
+              }
+              //val authToken = sec.generateRandomToken()
+
+              // if database contains token
+              // update auth_token. Set new auth_token even if old one was already set.
+
+
+
             case _ =>
               sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
           }
         } else if (req.method == "GET") {
           req.path match {
             case "/" =>
-              val cookies = ArrayBuffer[String]()
-              if(!req.header_map.contains("Cookie")){
-                cookies += "visits=1"
-                val content = templating.populate_index_template("1")
-                sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-              }else{
-                val cookie_str = req.header_map("Cookie")
-                val cookie_map = StrProcessing.put_cookies_in_map(cookie_str)
-                if(cookie_map.contains("visits")){
-                  val visits = cookie_map("visits").toInt + 1
-                  //val cookies = ArrayBuffer[String]()
-                  cookies += "visits=" + visits.toString
-                  val content = templating.populate_index_template(visits.toString)
-                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-
-                }else{
-                  val content = templating.populate_index_template("")
-                  sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), cookies))
-                }
-              }
+              val updated_visits = CookieProcessing.update_visits()
+              val content = templating.populate_index_template(updated_visits)
+              sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), CookieProcessing.set_cookies))
             case "/hello" =>
               sender() ! Write(response.buildOKResponseString("text/plain", "ni hao world"))
             case "/hi" =>
@@ -187,6 +207,13 @@ class TheServer extends Actor {
               //TODO is this a security concern. Users can see the entirety of functions.js.
               val content = response.readFile(dirs.globalChatFunctions_js, false)
               sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
+            case "/signup.js" =>
+              val content = response.readFile(dirs.signup_js, false)
+              sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
+
+            case "/login.js" =>
+              val content = response.readFile(dirs.login_js,false)
+              sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
             case "/websocket" =>
               if (!webSocketActors.contains(sender())) {
                 val accept_key = Websocket.get_websocket_accept_key(req)
@@ -204,6 +231,16 @@ class TheServer extends Actor {
               }else{
                 sender() ! Write(response.buildOKResponseString("text/plain", json_ret))
               }
+            case "/signup" =>
+              val content = response.readFile(dirs.signup_html, false)
+              sender() ! Write(response.buildOKResponseBytes("text/html", content))
+            case "/signupSuccess" =>
+              val content = response.readFile(dirs.signupsuccess_html, false)
+              sender() ! Write(response.buildOKResponseBytes("text/html", content))
+            case "/login" =>
+              //TODO if user is already logged in, redirect to the home page
+              val content = response.readFile(dirs.login_html, false)
+              sender() ! Write(response.buildOKResponseBytes("text/html", content))
             case _ =>
               //404 Not Found
               sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))

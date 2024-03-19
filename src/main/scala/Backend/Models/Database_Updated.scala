@@ -19,8 +19,73 @@ object Database_Updated {
     //TODO do you need to create the database here?
     createGlobalMessagesTable()
     createUsersTable()
+    createAuthenticatedUsersTable()
+  }
+
+  /*----------------------- authenticated users table below ----------------------------*/
+  /** Creates the authUsers table. A table containing the primary id used to identify users, as well as
+   * username, password, authentication cookie, etc.
+   * */
+  private def createAuthenticatedUsersTable(): Unit = {
+    connection.createStatement().execute("CREATE TABLE IF NOT EXISTS authUsers(user_id INT NOT NULL AUTO_INCREMENT, username VARCHAR(20), email TEXT, password_hash TEXT, password_salt TEXT, auth_token TEXT, token_salt TEXT, PRIMARY KEY (user_id), UNIQUE(username))")
+  }
+
+  /**
+   * Inserts a newly created user into the authUsers table
+   * */
+  def insertAuthenticatedUser(username: String, email: String, pass_hash: String, pass_salt: String, auth_token: String, token_salt: String): Boolean = {
+    try {
+      val statement = connection.prepareStatement("INSERT INTO authUsers (username, email, password_hash, password_salt, auth_token, token_salt) VALUES (?, ?, ?, ?, ?, ?)")
+      statement.setString(1, username)
+      statement.setString(2, email)
+      statement.setString(3, pass_hash)
+      statement.setString(4, pass_salt)
+      statement.setString(5, auth_token)
+      statement.setString(6, token_salt)
+      statement.execute()
+      true
+    }catch{
+      case s: SQLException =>
+        println(s)
+        false
+    }
 
   }
+  /** Lists the hashed password and salt associate with the username.
+   * @param username
+   * @return (hashed_password, salt) if the password and hash are found. null otherwise.
+   * */
+  def listAuthenticatedPasswordHash(username: String): String = {
+    val statement = connection.prepareStatement("Select password_hash FROM authUsers where username = ?")
+    statement.setString(1, username)
+    val res: ResultSet = statement.executeQuery()
+    try {
+      res.next()
+      val password_hash = res.getString("password_hash")
+
+      password_hash
+    } catch {
+      case s: SQLException =>
+        println(s)
+        null
+    }
+  }
+
+  /** Lists the id that will be used in session cookies */
+  def listAuthenticatedId(username: String): Unit = {
+
+  }
+
+  /** Lists the username that will be displayed on the index page */
+  def listAuthenticatedUsername(id: Int): Unit = {
+
+  }
+
+  /** Updates the token and salt of the authenticated user */
+  def updateAuthenticatedUserToken(id: Int, auth_token: String, token_salt: String): Unit = {
+
+  }
+
 
   /*---------------------- users table SQL below--------------------------*/
   /** Creates users table. users(user_id, username, email) Called by init_database().*/
@@ -103,7 +168,6 @@ object Database_Updated {
     }catch{
       case s: SQLException => println(s); ""
     }
-
   }
 
   /** Delete user. Called when DELETE /users/id is received by the server.

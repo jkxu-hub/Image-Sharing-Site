@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sign Up</title>
+    <link rel="stylesheet" type="text/css" href="../style.css"/>
+    <script src="signup.js"></script>
+</head>
+
+<body>
+<h1>Sign up</h1>
+<label for="username"> Username: </label>
+<input id="username" type="text" name="username"> <br>
+<label for="email"> Email: </label>
+<input id="email" type="text" name="email"> <br>
+<label for="password"> Password: </label>
+<input id="password" type="password" name="password"> <br>
+<input type="checkbox" onclick="togglePasswordVisibility()">Show Password <br>
+<!-- Add confirmation password function -->
+<button onclick="signUp()"> Sign Up</button> <br>
+
+<div id="ServerResponse" style="display: none;"> </div>
+
+
+</body>
+</html>

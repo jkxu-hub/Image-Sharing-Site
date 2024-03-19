@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Share</title>
+  <link rel="stylesheet" type="text/css" href="../style.css"/>
+  <script src="login.js"></script>
+</head>
+
+<body>
+<!---TODO URGENT: NEED to prevent against XSRF attacks-->
+<h1>Log In</h1>
+<label for="username"> Username: </label>
+<input id="username" type="text" name="username"> <br>
+<label for="password"> Password: </label>
+<input id="password" type="password" name="password"> <br>
+<input type="checkbox" onclick="togglePasswordVisibility()">Show Password <br>
+<!-- Add confirmation password function -->
+<button onclick="login()"> Log In </button> <br>
+
+<div id="ServerResponse" style="display: none;"> </div>
+
+</body>
+</html>
