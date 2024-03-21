@@ -2,6 +2,8 @@ package Backend.Models
 import java.sql.{Connection, DriverManager, ResultSet, SQLException}
 import scala.collection.mutable.ArrayBuffer
 import Backend.Models.{json_creation => json_create}
+import org.joda.time.DateTime
+import java.sql.Timestamp
 
 object Database_Updated {
   //TODO: change to these values for docker (instead of "localhost" change it to the name of the service)
@@ -20,7 +22,99 @@ object Database_Updated {
     createGlobalMessagesTable()
     createUsersTable()
     createAuthenticatedUsersTable()
+    createUserAuthTokensTable()
   }
+
+  /*---------------------- userAuthTokens table below --------------------------*/
+  /** A table used to store authentication tokens a specific user may have.
+   *  Schema: userAuthTokens(user_id, username, token_id, token_hash, token_salt, token_exp)
+   * */
+  private def createUserAuthTokensTable(): Unit = {
+    connection.createStatement().execute("CREATE TABLE IF NOT EXISTS userAuthTokens(user_id INT, username VARCHAR(20), token_id INT NOT NULL AUTO_INCREMENT, auth_token_hash TEXT, token_salt TEXT, token_exp datetime, primary key (user_id,token_id), unique key(token_id))")
+  }
+
+  /** Insert a new token entry.
+   * Locks the table so that a the token_id value can be gotten without race conditions.
+   *
+   * @Return 0 if there was an error, or the token_id
+   *
+   * */
+  // takes in user_id, username, auth_token_hash, token_salt, token_exp
+  // insert into userAuthTokens (user_id, username, auth_token_hash, token_salt, token_exp) values(?,?,?,?,?)
+  def insertNewTokenEntry(user_id: Int, username: String, auth_token_hash: String, token_salt: String, token_exp: Timestamp): Int = {
+    try {
+      val lockTable = "LOCK Tables userAuthTokens Write;"
+      val insertEntry = "insert into userAuthTokens (user_id, username, auth_token_hash, token_salt, token_exp) VALUES (?, ?, ?, ?, ?)"
+      val selectTokenID = "Select last_insert_id();"
+      val unlockTable = "Unlock tables;"
+
+      //locks the DB
+      val lockStatement = connection.createStatement()
+      lockStatement.execute(lockTable)
+
+      //Inserts into DB
+      val insertStatement = connection.prepareStatement(insertEntry)
+      insertStatement.setInt(1, user_id)
+      insertStatement.setString(2, username)
+      insertStatement.setString(3, auth_token_hash)
+      insertStatement.setString(4, token_salt)
+      insertStatement.setTimestamp(5, token_exp)
+      val affectedRows: Int = insertStatement.executeUpdate()
+      if (affectedRows != 1){
+        return 0
+      }
+      val selectStatement = connection.prepareStatement(selectTokenID)
+      val res: ResultSet = selectStatement.executeQuery()
+      res.next()
+      val token_id = res.getInt("last_insert_id()")
+      val unlockStatement = connection.createStatement()
+      unlockStatement.execute(unlockTable)
+      token_id
+    } catch {
+      case s: SQLException =>
+        println("insertNewTokenEntry: "+ s)
+        0
+    }
+  }
+  /** Get token expiration*/
+  def listTokenExpiration(user_id: Int, token_id: Int): Timestamp = {
+    val statement = connection.prepareStatement("select token_exp from userAuthTokens where user_id = ? and token_id = ?")
+    statement.setInt(1, user_id)
+    statement.setInt(2, token_id)
+    val res: ResultSet = statement.executeQuery()
+    try {
+      res.next()
+      res.getTimestamp("token_exp")
+    } catch {
+      case s: SQLException =>
+        println("listTokenExpiration: " + s)
+        null
+    }
+  }
+  /** Get hashed_token */
+  def listTokenHash(user_id: Int, token_id: Int): String = {
+    val statement = connection.prepareStatement("select auth_token_hash from userAuthTokens where user_id = ? and token_id = ?")
+    statement.setInt(1, user_id)
+    statement.setInt(2, token_id)
+    val res: ResultSet = statement.executeQuery()
+    try {
+      res.next()
+      res.getString("auth_token_hash")
+    } catch {
+      case s: SQLException =>
+        println("listTokenHash: " +s)
+        null
+    }
+  }
+
+  def deleteTokenEntry(user_id: Int, token_id: Int): Unit = {
+    val sql = "delete from userAuthTokens where user_id = ? and token_id = ?"
+    val statement = connection.prepareStatement(sql)
+    statement.setInt(1, user_id)
+    statement.setInt(2, token_id)
+    statement.execute()
+  }
+
 
   /*----------------------- authenticated users table below ----------------------------*/
   /** Creates the authUsers table. A table containing the primary id used to identify users, as well as
@@ -46,10 +140,9 @@ object Database_Updated {
       true
     }catch{
       case s: SQLException =>
-        println(s)
+        println("insertAuthenticatedUser: " +s)
         false
     }
-
   }
   /** Lists the hashed password and salt associate with the username.
    * @param username
@@ -66,25 +159,42 @@ object Database_Updated {
       password_hash
     } catch {
       case s: SQLException =>
-        println(s)
+        println("listAuthenticatedPasswordHash: " + s)
         null
     }
   }
 
   /** Lists the id that will be used in session cookies */
-  def listAuthenticatedId(username: String): Unit = {
-
+  def listAuthenticatedId(username: String): Int = {
+    val statement = connection.prepareStatement("select user_id from authUsers where username = ?")
+    statement.setString(1, username)
+    val res: ResultSet = statement.executeQuery()
+    try{
+      res.next()
+      res.getInt("user_id")
+    } catch{
+      case s: SQLException =>
+        println("listAuthenticatedId: " + s)
+        0
+    }
   }
 
   /** Lists the username that will be displayed on the index page */
-  def listAuthenticatedUsername(id: Int): Unit = {
+  def listAuthenticatedUsername(user_id: Int): String = {
+    val statement = connection.prepareStatement("select username from authUsers where user_id = ?")
+    statement.setInt(1, user_id)
+    val res: ResultSet = statement.executeQuery()
+    try {
+      res.next()
+      res.getString("username")
+    } catch {
+      case s: SQLException =>
+        println("listAuthenticatedId: " + s)
+        ""
+    }
 
   }
 
-  /** Updates the token and salt of the authenticated user */
-  def updateAuthenticatedUserToken(id: Int, auth_token: String, token_salt: String): Unit = {
-
-  }
 
 
   /*---------------------- users table SQL below--------------------------*/

@@ -3,10 +3,11 @@
     <meta charset="UTF-8">
     <title>Image Share</title>
     <link rel="stylesheet" type="text/css" href="../style.css"/>
+    <script src="index.js"></script>
 </head>
 <!-- <body onload="welcomeAlert();"> -->
 
-<h1>Welcome!</h1>
+<h1>Welcome{{username}}!</h1>
 <p>List of users who have submitted pictures: <br>
     {{name}}
 </p>
@@ -20,8 +21,9 @@
 <br>
 <br>
 
-<a href="/login" class="button">Log in</a>
-<a href="/signup" class="button">Sign Up</a>
+{{login}}
+{{signup}}
+{{logout}}
 
 <p>Please submit a photo to the gallery:</p>
 <form action="/image-upload" id="image-form" method="post" enctype="multipart/form-data">
@@ -49,7 +51,7 @@
 <p>Number of Page Visits: {{visits}}</p>
 
 <a href="/global-chat" class="button">Global Chat</a>
-<script src="../functions.js"></script>
+
 
 </body>
 </html>

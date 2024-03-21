@@ -8,7 +8,7 @@ function login(){
         if (this.readyState === 4 && this.status === 200){
             window.location.href = "/";
             // Do something with the response
-            //console.log(this.response);
+            console.log(this.response);
         }else{
             console.log(this.response);
             const serverResponseElem = document.getElementById("ServerResponse");

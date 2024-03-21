@@ -41,7 +41,7 @@ object templating {
    * and populates the page with the htmlClientNames and htmlClientImages.
    *
    * */
-  def populate_index_template(visits_cookie: Int): String = {
+  def populate_index_template(visits_cookie: Int, username: String,signedIn: Boolean): String = {
     val bufferedSource = scala.io.Source.fromFile(dirs.home_page)
     var content = bufferedSource.mkString
     content = content.replace("{{name}}", database.htmlClientNames)
@@ -57,6 +57,18 @@ object templating {
     content = content.replace("{{token1}}", randomToken1)
     content = content.replace("{{token2}}", randomToken2)
     content = content.replace("{{visits}}", visits_cookie.toString)
+    if(signedIn){
+      content = content.replace("{{username}}", " " + username)
+      content = content.replace("{{login}}", "")
+      content = content.replace("{{signup}}", "")
+      content = content.replace("{{logout}}", htmlGen.generate_logout_button())
+    }else{
+      content = content.replace("{{username}}", "")
+      content = content.replace("{{login}}", htmlGen.generate_login_button())
+      content = content.replace("{{signup}}", htmlGen.generate_sign_up_button())
+      content = content.replace("{{logout}}", "")
+    }
+
 
     content
   }

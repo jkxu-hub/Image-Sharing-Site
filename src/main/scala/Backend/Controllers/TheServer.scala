@@ -7,11 +7,13 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 import java.net.InetSocketAddress
-import Backend.Models.{Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec, CookieProcessing}
+import Backend.Models.{CookieProcessing, Payload, Request, Websocket, WebsocketResponse, Database => database, Database_Updated => database_u, HttpResponse => response, SaveFormInfo => forms, StringProcessing => StrProcessing, security => sec}
 import Backend.Views.templating
 import Backend.Views.{PageDirectories => dirs}
+import org.joda.time.DateTime
 
 import java.nio.charset.StandardCharsets
+import java.sql.Timestamp
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.util.matching.Regex
 
@@ -50,9 +52,7 @@ class TheServer extends Actor {
       sender() ! Register(self)
 
     case r: Received =>
-      //In this context sender() refers to whoever sent the Received message to TheWebserver Actor.
-      //In this case the sender() is the client.
-      //print(sender())
+
       if(!Payload.isBuffering){
         //println(r.data.utf8String)
       }
@@ -126,10 +126,8 @@ class TheServer extends Actor {
 
             case "/signup" =>
               println(Payload.buffer.utf8String)
-
               val return_code = forms.save_sign_up(Payload.buffer)
               Payload.reset_fields()
-
               if(return_code == "OK"){
                 sender() ! Write(response.buildOKResponseString("text/plain", return_code))
               }else{
@@ -146,11 +144,12 @@ class TheServer extends Actor {
 
               val return_code = sec.checkPasswordMatch(username, password)
 
+              println(return_code)
               if(return_code == "OK"){
-                CookieProcessing.updateAuthTokens()
-
+                //TODO check that number of sessions is under 5, otherwise the user will have to logout from a session
+                req.cookies.updateAuthTokens(username)
                 // send cookies and bytes to the homepage. Redirects to the homepage.
-                sender() ! Write(response.buildOKResponseString("text/plain", return_code))
+                sender() ! Write(response.buildOKResponseWithCookies("text/plain", req.cookies.outgoing_cookies))
               }else{
                 sender() ! Write(response.buildBadRequestResponse("text/plain", return_code))
               }
@@ -158,18 +157,28 @@ class TheServer extends Actor {
 
               // if database contains token
               // update auth_token. Set new auth_token even if old one was already set.
-
-
-
             case _ =>
               sender() ! Write(response.buildForbiddenResponse("text/plain", "403 Forbidden. Your submission was REJECTED!"))
           }
         } else if (req.method == "GET") {
           req.path match {
             case "/" =>
-              val updated_visits = CookieProcessing.update_visits()
-              val content = templating.populate_index_template(updated_visits)
-              sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), CookieProcessing.set_cookies))
+              val user_id_str = req.cookies.get_user_id()
+              var user_id = 0
+              var username =""
+              if(user_id_str != null){
+                user_id = user_id_str.toInt
+                username = database_u.listAuthenticatedUsername(user_id)
+              }
+
+              val updated_visits = req.cookies.update_visits()
+              var content = ""
+              if(sec.isAuthenticatedUserRequest(req)){
+                content = templating.populate_index_template(updated_visits, username, true)
+              }else{
+                content = templating.populate_index_template(updated_visits, "", false)
+              }
+              sender() ! Write(response.buildOKResponseBytesNCookies("text/html", ByteString(content), req.cookies.outgoing_cookies))
             case "/hello" =>
               sender() ! Write(response.buildOKResponseString("text/plain", "ni hao world"))
             case "/hi" =>
@@ -213,6 +222,10 @@ class TheServer extends Actor {
 
             case "/login.js" =>
               val content = response.readFile(dirs.login_js,false)
+              sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
+
+            case "/index.js" =>
+              val content = response.readFile(dirs.index_js, false)
               sender() ! Write(response.buildOKResponseBytes("text/javascript", content))
             case "/websocket" =>
               if (!webSocketActors.contains(sender())) {
@@ -277,11 +290,20 @@ class TheServer extends Actor {
               }else{
                 sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
               }
+            case "/logout" =>
+              println(r.data.utf8String)
+              // update the cookies
+              req.cookies.logoutUpdateOutgoingCookies()
+              val user_id = req.cookies.get_user_id()
+              val token_id = req.cookies.get_token_id()
+              if (user_id != null && token_id != null) {
+                database_u.deleteTokenEntry(user_id.toInt, token_id.toInt)
+              }
+              sender() ! Write(response.buildOKResponseWithCookies("text/plain", req.cookies.outgoing_cookies))
+
             case _ =>
               sender() ! Write(response.buildNotFoundResponse("text/plain", "404 Content Not Found!"))
-
           }
-
         }
 
       }

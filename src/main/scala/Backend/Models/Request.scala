@@ -18,6 +18,7 @@ class Request(data: ByteString) {
   var (requestLine, headers, payload): (String, String, Array[Byte])  = ("", "", Array())
   var (method, path, version) = ("","","")
   var header_map: Map[String, String] = Map[String, String]()
+  var cookies: CookieProcessing = null
 
   //Initializing
   if (Payload.isBuffering){
@@ -30,7 +31,8 @@ class Request(data: ByteString) {
     val h_map: Map[String, String] = put_headers_in_map(headers)
     header_map = h_map
     //TODO make cookie_map a variable of Request
-    CookieProcessing.init_cookie_map(header_map)
+    cookies = new CookieProcessing(header_map)
+
     if (method == "POST" || method == "PUT"){
       init_payload()
     }

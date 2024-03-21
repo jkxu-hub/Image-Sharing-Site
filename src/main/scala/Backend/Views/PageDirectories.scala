@@ -4,6 +4,8 @@ object PageDirectories {
   private val frontend = "src/main/scala/Frontend/"
   val multiImageView_page: String = frontend + "MultiImageView/template.html"
   val home_page: String = frontend + "Home/index.html"
+  val index_js: String = frontend + "Home/index.js"
+
   val successfulFormSubmission_page: String = frontend + "SuccessfulFormSubmission/successfulFormSubmission.html"
   val globalChatPage: String = frontend + "GlobalChat/globalChat.html"
 

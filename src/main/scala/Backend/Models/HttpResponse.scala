@@ -86,10 +86,26 @@ object HttpResponse {
     response += "X-Content-Type-Options: nosniff\r\n"
 
     for (cookie <- cookies) {
-      response += "Set-Cookie: " + cookie + "; Max-Age=36000; HttpOnly" + "\r\n"
+      response += "Set-Cookie: " + cookie + "; Expires=Wed, 21 Oct 2024 07:28:00 GMT; HttpOnly; SameSite=Strict" + "\r\n"
+      //response += "Set-Cookie: " + cookie + "; Max-Age: 36000; HttpOnly; SameSite: Strict" + "\r\n"
     }
     response += "Content-Length: " + content.length.toString + "\r\n"
     response += "\r\n" //these are the two \r\n that separate header from body
     ByteString(response) ++ content
   }
+
+  def buildOKResponseWithCookies(mimeType: String, cookies: ListBuffer[String]): ByteString = {
+    var response = ""
+    response += "HTTP/1.1 " + "200 OK" + "\r\n"
+    response += "Content-Type: " + mimeType + "\r\n"
+    response += "X-Content-Type-Options: nosniff\r\n"
+    for (cookie <- cookies) {
+      response += "Set-Cookie: " + cookie + "\r\n"
+      //response += "Set-Cookie: " + cookie + "; Max-Age: 36000; HttpOnly; SameSite: Strict" + "\r\n"
+    }
+    response += "Content-Length: " + 0.toString + "\r\n"
+    response += "\r\n" //these are the two \r\n that separate header from body
+    ByteString(response)
+  }
+
 }

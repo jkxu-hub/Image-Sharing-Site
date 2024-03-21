@@ -14,5 +14,15 @@ object htmlGenerator {
     }
     html.toString()
   }
+  def generate_login_button(): String = {
+    "<a href=\"/login\" class=\"button\">Log In</a>"
+  }
+
+  def generate_sign_up_button(): String = {
+    "<a href=\"/signup\" class=\"button\">Sign Up</a>"
+  }
+  def generate_logout_button(): String = {
+    "<button onclick=\"logout()\"> Log Out </button> <br>"
+  }
 
 }
